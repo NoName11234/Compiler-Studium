@@ -2,7 +2,7 @@
 
 A=/cc-support
 B=./
-FILES="requirements.txt wasm-support/Makefile wasm-support/native-lib/CMakeLists.txt wasm-support/native-lib/env.c"
+FILES="package.json requirements.txt wasm-support/Makefile wasm-support/native-lib/CMakeLists.txt wasm-support/native-lib/env.c"
 
 for x in $FILES; do
     if ! diff -u $A/$x $B/$x; then

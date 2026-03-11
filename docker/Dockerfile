@@ -56,7 +56,7 @@ RUN mkdir -p /cc-support/wasm-support
 COPY ./requirements.txt /cc-support/requirements.txt
 COPY ./package.json /cc-support/package.json
 
-RUN pip install  --break-system-packages -r /cc-support/requirements.txt
+RUN pip install --break-system-packages -r /cc-support/requirements.txt
 RUN cd /cc-support && npm install && \
   ln -s /cc-support/node_modules/.bin/pyright /usr/local/bin/pyright
 

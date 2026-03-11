@@ -43,10 +43,10 @@ def md5(path: str) -> str:
     return hash_md5.hexdigest()
 
 def listDictAdd[K, V](d: dict[K, list[V]], k: K, v: V | list[V]):
-    if not isinstance(v, list):
-        listV = [v]
+    if isinstance(v, list):
+        listV: list[V] = cast(list[V], v)
     else:
-        listV: list[V] = v
+        listV: list[V] = [v]
     old = d.get(k)
     if old is None:
         d[k] = listV[:]
