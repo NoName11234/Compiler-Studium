@@ -109,6 +109,8 @@ and the ARM architecture.
 
 For the initial setup, proceed like this:
 
+* Install docker and visual studio code on your machine.
+* Install the "Dev Containers" extension in visual studio code.
 * Create a checkout of this repository on your local machine.
 * Open the toplevel directory of the checkout in visual studio code ("open folder").
 * Usually, visual studio code will prompt you
@@ -124,7 +126,7 @@ For the initial setup, proceed like this:
     work with a ARM-based Macs, you have to edit the file
     `.devcontainer/devcontainer.json`. The docker image to used is specified
     in a comment there.
-* The terminal in visual studio code also runs using the docker image.
+* The terminal in visual studio code also runs inside the docker image.
 * If you want to use the docker image on the commandline, use this command,
   (replacing `/PATH_TO_YOUR_CHECKOUT_OF_THIS_REPO` with the absolute path to the clone
   of the repository):
@@ -142,6 +144,8 @@ with `wasm-support/native-lib/env.c` (for native code used by wasm). The script
 `docker/check-image-uptodate` can be used to check if everything is in sync.
 Please contact the maintainer of this repository if a new docker image is needed.
 
+Use the command "DevContainers: Rebuild container without cache" from the command palette
+to force using the new image after an update.
 
 ## Manual installation
 
