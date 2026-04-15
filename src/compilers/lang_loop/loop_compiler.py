@@ -10,6 +10,7 @@ def compileModule(m: mod, cfg: CompilerConfig) -> WasmModule:
     Compiles the given module.
     """
     vars = loop_tychecker.tycheckModule(m)
+    #print(m.stmts)
     instrs = compileStmts(m.stmts)
     idMain = WasmId('$main')
     locals: list[tuple[WasmId, WasmValtype]] = [createLocals(ident, type) for (ident, type) in vars.items()]
@@ -87,11 +88,12 @@ def compileStmt(stmt: stmt) -> list [WasmInstr]:
             block_label = generateBlockLabel()
             loop_label = generateLoopLabel()
 
-            start_of_loop = condition_instructions + [WasmInstrBranch(block_label, True)]
-            end_of_loop = condition_instructions + [WasmInstrBranch(loop_label, True)]
+            start_of_loop = condition_instructions + [WasmInstrIf(None, [], [WasmInstrBranch(block_label, False)])]
+            end_of_loop = [WasmInstrBranch(loop_label, False)]
+            #end_of_loop = condition_instructions + [WasmInstrBranch(loop_label, True)]
 
-            loop_instructions = [WasmInstrLoop(loop_label,  body_instructions + end_of_loop)]
-            instructions += [WasmInstrBlock(block_label, None, start_of_loop + loop_instructions)]
+            loop_instructions: list [WasmInstr] = [WasmInstrLoop(loop_label, start_of_loop + body_instructions + end_of_loop)]
+            instructions += [WasmInstrBlock(block_label, None, loop_instructions)]
 
             return instructions
 
@@ -136,10 +138,16 @@ def compileExpr(exp: exp) -> list [WasmInstr]:
                 return []
         case UnOp(op, arg):
             instructions: list [WasmInstr] = []
-            instructions += [WasmInstrConst('i64', 0)]
-            instructions += compileExpr(arg)
-            instructions += [WasmInstrNumBinOp('i64', 'sub')]
-            return instructions
+            match op:
+                case USub():
+                    instructions += [WasmInstrConst('i64', 0)]
+                    instructions += compileExpr(arg)
+                    instructions += [WasmInstrNumBinOp('i64', 'sub')]
+                    return instructions
+                case Not():
+                    instructions += compileExpr(arg)
+                    instructions += [WasmInstrIf('i32', [WasmInstrConst('i32', 0)], [WasmInstrConst('i32', 1)])]
+                    return instructions
         case BinOp(left, op, right):
             instructions: list [WasmInstr] = []
             instructionsLeft: list [WasmInstr] = []
@@ -177,5 +185,4 @@ def compileExpr(exp: exp) -> list [WasmInstr]:
                 case Or():
                     instructions += instructionsLeft
                     instructions += [WasmInstrIf('i32', [WasmInstrConst('i32', 1)], instructionsRight)]
-
             return instructions
