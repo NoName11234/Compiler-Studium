@@ -1,0 +1,12 @@
+WHITESPACE: (" "|/\t/|/\r/|/\n/)+
+LETTER: /[a-zA-Z]/
+DIGIT: "0".."9" 
+STRING: /\"/(LETTER|DIGIT)*/\"/
+INT: DIGIT+
+LBRACE: "{"
+RBRACE: "}"
+COLON: ":"
+COMMA: ","
+
+%ignore WHITESPACE
+start: STRING INT LBRACE RBRACE COLON COMMA
