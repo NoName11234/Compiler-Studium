@@ -3,3 +3,4 @@
 cd $(dirname $0)/..
 
 python src/main.py "$@"
+#python -m pdb src/main.py "$@"
