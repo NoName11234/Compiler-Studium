@@ -233,13 +233,8 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
 
                 #get array address from args
                 instructions += compileExpr(args[0], cfg)
-                # load array header
-                instructions += [WasmInstrMem('i32', 'load')]
-                #shift right by 4 bit to get the length
-                instructions += [WasmInstrConst('i32', 4)]
-                instructions += [WasmInstrNumBinOp('i32', 'shr_u')]
-                # convert to i64
-                instructions += [WasmInstrConvOp('i64.extend_i32_u')]
+
+                instructions += arrayLenInstrs()
 
                 return instructions
             else:
@@ -358,9 +353,19 @@ def compileInitArray(lenExp: atomExp, elemTy: ty, cfg: CompilerConfig) -> list[W
 
     return instructions # these instructions leave the address of the created array on the stack
 
-
+# expects address of array on stack
 def arrayLenInstrs() -> list[WasmInstr]:
-    return []
+    instructions: list [WasmInstr] = []
+
+    # load array header
+    instructions += [WasmInstrMem('i32', 'load')]
+    #shift right by 4 bit to get the length
+    instructions += [WasmInstrConst('i32', 4)]
+    instructions += [WasmInstrNumBinOp('i32', 'shr_u')]
+    # convert to i64
+    instructions += [WasmInstrConvOp('i64.extend_i32_u')]
+
+    return instructions
 
 def arrayOffsetInstrs(arrayExp: atomExp, indexExp: atomExp) -> list[WasmInstr]:
     return []
