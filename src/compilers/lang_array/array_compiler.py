@@ -136,9 +136,9 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
     match exp:
         case AtomExp(atomExp):
             return [compileAtomicExpr(atomExp)]
-        case ArrayInitDyn(len, elemInit):
+        case ArrayInitDyn(length, elemInit):
             # leaves array address on top of stack
-            instructions = compileInitArray(len, tyOfAtomExp(elemInit), cfg)
+            instructions = compileInitArray(length, tyOfAtomExp(elemInit), cfg)
             # set $@tmp_i32 to array address, leave it on top of stack
             instructions += [WasmInstrVarLocal('tee', WasmId('$@tmp_i32'))]
             instructions += [WasmInstrVarLocal('get', WasmId('$@tmp_i32'))]
@@ -158,7 +158,6 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
             condition_check = [WasmInstrIf(None, [], [WasmInstrBranch(block_label, False)])]
 
             body_instructions: list[WasmInstr] = []
-            size_in_bytes = 0
             if tyOfAtomExp(elemInit) == Int():
                 size_in_bytes = 8
 
@@ -192,7 +191,26 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
             return instructions
 
         case ArrayInitStatic(elemsInit):
-            pass
+            # leaves array address on top of stack
+            instructions = compileInitArray(IntConst(len(elemsInit)), tyOfAtomExp(elemsInit[0]), cfg)
+
+            if tyOfAtomExp(elemsInit[0]) == Int():
+                offset = 8
+            else:
+                offset = 4
+
+            for idx, atomExp in enumerate(elemsInit):
+                instructions += [WasmInstrVarLocal('tee', WasmId('$@tmp_i32'))]
+                instructions += [WasmInstrVarLocal('get', WasmId('$@tmp_i32'))]
+                instructions += [WasmInstrConst('i32', 4 + offset * idx)]
+                instructions += [WasmInstrNumBinOp('i32', 'add')]
+                instructions += [compileAtomicExpr(atomExp)]
+
+                if tyOfAtomExp(elemsInit[0]) == Int():
+                    instructions += [WasmInstrMem('i64', 'store')]
+                else:
+                    instructions += [WasmInstrMem('i32', 'store')]
+
         case Subscript(array, index):
             pass
         case Call(ident, args):
