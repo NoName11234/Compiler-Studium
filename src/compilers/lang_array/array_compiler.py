@@ -289,7 +289,9 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
                     instructions += instructionsLeft
                     instructions += [WasmInstrIf('i32', [WasmInstrConst('i32', 1)], instructionsRight)]
                 case Is():
-                    pass
+                    instructions += instructionsLeft
+                    instructions += instructionsRight
+                    instructions += [WasmInstrIntRelOp('i32', 'eq')]
             return instructions
         
 
