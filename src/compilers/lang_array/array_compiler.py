@@ -368,4 +368,23 @@ def arrayLenInstrs() -> list[WasmInstr]:
     return instructions
 
 def arrayOffsetInstrs(arrayExp: atomExp, indexExp: atomExp) -> list[WasmInstr]:
-    return []
+    instructions: list [WasmInstr] = []
+
+    if tyOfAtomExp(arrayExp) == Int():
+        offset = 8
+    else:
+        offset = 4
+
+    # get index value on stack
+    instructions += [compileAtomicExpr(indexExp)]
+    # convert i64 to i32
+    instructions += [WasmInstrConvOp('i32.wrap_i64')]
+    instructions += [WasmInstrConst('i32', offset)]
+    # multiply index with offset
+    instructions += [WasmInstrNumBinOp('i32', 'mul')]
+
+    # add 4 for the array header
+    instructions += [WasmInstrConst('i32', 4)]
+    instructions += [WasmInstrNumBinOp('i32', 'add')]
+
+    return instructions
