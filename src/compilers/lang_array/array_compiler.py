@@ -228,8 +228,22 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
                 return instructions
             elif ident.name == "input_int":
                 return [WasmInstrCall(WasmId("$input_i64"))]
+            elif ident.name == "len":
+                instructions: list [WasmInstr] = []
+
+                #get array address from args
+                instructions += compileExpr(args[0], cfg)
+                # load array header
+                instructions += [WasmInstrMem('i32', 'load')]
+                #shift right by 4 bit to get the length
+                instructions += [WasmInstrConst('i32', 4)]
+                instructions += [WasmInstrNumBinOp('i32', 'shr_u')]
+                # convert to i64
+                instructions += [WasmInstrConvOp('i64.extend_i32_u')]
+
+                return instructions
             else:
-                return []
+                raise Exception(f'Call {ident} with args {args} is not known to the compiler')
         case UnOp(op, arg):
             instructions: list [WasmInstr] = []
             match op:
