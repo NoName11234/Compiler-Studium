@@ -212,7 +212,48 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
                     instructions += [WasmInstrMem('i32', 'store')]
 
         case Subscript(array, index):
-            pass
+            instructions: list [WasmInstr] = []
+
+            arraySizeErrorInstructions = Errors.outputError('ArraySizeError')
+            terminateInstructions: list[WasmInstr] = [WasmInstrTrap()]
+
+            # size check
+            ## check whether size of array is greater than index
+            ### get array address on stack (this value is expected by the instructions for the array length)
+            instructions += [compileAtomicExpr(array)]
+            ### get instructions for size of array
+            instructions += arrayLenInstrs()
+            ### load index on stack
+            instructions += [compileAtomicExpr(index)]
+            instructions += [WasmInstrIntRelOp('i32', 'gt_u')]
+            instructions += [WasmInstrIf(None, [], arraySizeErrorInstructions + terminateInstructions)]
+            ## check whether index is greater then 0
+            instructions += [compileAtomicExpr(index)]
+            instructions += [WasmInstrConst('i32', 0)]
+            instructions += [WasmInstrIf(None, [], arraySizeErrorInstructions + terminateInstructions)]
+
+            #compute the address of the element
+            instructions += [compileAtomicExpr(array)]
+            instructions += [compileAtomicExpr(index)]
+            instructions += [WasmInstrConvOp('i32.wrap_i64')]
+
+            if tyOfAtomExp(array) == Int():
+                instructions += [WasmInstrConst('i32', 8)]
+            else:
+                instructions += [WasmInstrConst('i32', 4)]
+            
+            instructions += [WasmInstrNumBinOp('i32', 'mul')]
+            instructions += [WasmInstrConst('i32', 4)]
+            instructions += [WasmInstrNumBinOp('i32', 'add')] #now on top of the stack: offset of the element
+            instructions += [WasmInstrNumBinOp('i32', 'add')] #now on top of the stack: address of the element
+
+            if tyOfAtomExp(array) == Int():
+                instructions += [WasmInstrMem('i64', 'load')]
+            else:
+                instructions += [WasmInstrMem('i32', 'load')]
+
+            return instructions
+            
         case Call(ident, args):
             if ident.name == "print":
                 instructions: list [WasmInstr] = []
