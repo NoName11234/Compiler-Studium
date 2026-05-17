@@ -6,7 +6,7 @@ import lang_array.array_tychecker as array_tychecker
 import lang_array.array_transform as array_transform
 from lang_array.array_compilerSupport import *
 from common.compilerSupport import *
-import common.utils as utils
+#import common.utils as utils
 
 def compileModule(m: plainAst.mod, cfg: CompilerConfig) -> WasmModule:
     """
@@ -82,7 +82,19 @@ def compileStmt(stmt: stmt, cfg: CompilerConfig) -> list [WasmInstr]:
 
     match stmt:
         case SubscriptAssign(left, index, right):
-            pass
+            # address of array index is on the stack after this
+            instructions += arrayOffsetInstrs(left, index)
+
+            # compile the instructions for the value to be assigned
+            instructions += compileExpr(right, cfg);
+
+            if tyOfAtomExp(left) == Int():
+                instructions += [WasmInstrMem('i64', 'store')]
+            else:
+                instructions += [WasmInstrMem('i32', 'store')]
+
+            return instructions
+
         case StmtExp(exp):
             return compileExpr(exp, cfg)
         case Assign(var, right):
@@ -216,38 +228,8 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
         case Subscript(array, index):
             instructions: list [WasmInstr] = []
 
-            arraySizeErrorInstructions = Errors.outputError('ArraySizeError')
-            terminateInstructions: list[WasmInstr] = [WasmInstrTrap()]
-
-            # size check
-            ## check whether size of array is greater than index
-            ### get array address on stack (this value is expected by the instructions for the array length)
-            instructions += [compileAtomicExpr(array)]
-            ### get instructions for size of array
-            instructions += arrayLenInstrs()
-            ### load index on stack
-            instructions += [compileAtomicExpr(index)]
-            instructions += [WasmInstrIntRelOp('i32', 'gt_u')]
-            instructions += [WasmInstrIf(None, [], arraySizeErrorInstructions + terminateInstructions)]
-            ## check whether index is greater then 0
-            instructions += [compileAtomicExpr(index)]
-            instructions += [WasmInstrConst('i32', 0)]
-            instructions += [WasmInstrIf(None, [], arraySizeErrorInstructions + terminateInstructions)]
-
-            #compute the address of the element
-            instructions += [compileAtomicExpr(array)]
-            instructions += [compileAtomicExpr(index)]
-            instructions += [WasmInstrConvOp('i32.wrap_i64')]
-
-            if tyOfAtomExp(array) == Int():
-                instructions += [WasmInstrConst('i32', 8)]
-            else:
-                instructions += [WasmInstrConst('i32', 4)]
-            
-            instructions += [WasmInstrNumBinOp('i32', 'mul')]
-            instructions += [WasmInstrConst('i32', 4)]
-            instructions += [WasmInstrNumBinOp('i32', 'add')] #now on top of the stack: offset of the element
-            instructions += [WasmInstrNumBinOp('i32', 'add')] #now on top of the stack: address of the element
+            #compute the address of the element with size check
+            instructions += arrayOffsetInstrs(array, index)
 
             if tyOfAtomExp(array) == Int():
                 instructions += [WasmInstrMem('i64', 'load')]
@@ -414,6 +396,25 @@ def arrayLenInstrs() -> list[WasmInstr]:
 
 def arrayOffsetInstrs(arrayExp: atomExp, indexExp: atomExp) -> list[WasmInstr]:
     instructions: list [WasmInstr] = []
+
+    #check whether index is inside bounds
+    arraySizeErrorInstructions = Errors.outputError('ArraySizeError')
+    terminateInstructions: list[WasmInstr] = [WasmInstrTrap()]
+
+    # size check
+    ## check whether size of array is greater than index
+    ### get array address on stack (this value is expected by the instructions for the array length)
+    instructions += [compileAtomicExpr(arrayExp)]
+    ### get instructions for size of array
+    instructions += arrayLenInstrs()
+    ### load index on stack
+    instructions += [compileAtomicExpr(indexExp)]
+    instructions += [WasmInstrIntRelOp('i32', 'gt_u')]
+    instructions += [WasmInstrIf(None, [], arraySizeErrorInstructions + terminateInstructions)]
+    ## check whether index is greater then 0
+    instructions += [compileAtomicExpr(indexExp)]
+    instructions += [WasmInstrConst('i32', 0)]
+    instructions += [WasmInstrIf(None, [], arraySizeErrorInstructions + terminateInstructions)]
 
     if tyOfAtomExp(arrayExp) == Int():
         offset = 8
