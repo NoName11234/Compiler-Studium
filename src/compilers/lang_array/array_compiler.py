@@ -211,6 +211,8 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
                 else:
                     instructions += [WasmInstrMem('i32', 'store')]
 
+            return instructions
+
         case Subscript(array, index):
             instructions: list [WasmInstr] = []
 
