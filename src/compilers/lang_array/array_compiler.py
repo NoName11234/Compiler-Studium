@@ -217,8 +217,10 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
             else:
                 offset = 4
 
+            # save array address in temporary variable
+            instructions += [WasmInstrVarLocal('set', WasmId('$@tmp_i32'))]
+
             for idx, atomExp in enumerate(elemsInit):
-                instructions += [WasmInstrVarLocal('tee', WasmId('$@tmp_i32'))]
                 instructions += [WasmInstrVarLocal('get', WasmId('$@tmp_i32'))]
                 instructions += [WasmInstrConst('i32', 4 + offset * idx)]
                 instructions += [WasmInstrNumBinOp('i32', 'add')]
@@ -228,6 +230,9 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
                     instructions += [WasmInstrMem('i64', 'store')]
                 else:
                     instructions += [WasmInstrMem('i32', 'store')]
+
+            # place array address back on stack as it is expected by assign
+            instructions += [WasmInstrVarLocal('get', WasmId('$@tmp_i32'))]
 
             return instructions
 
@@ -445,6 +450,10 @@ def arrayOffsetInstrs(arrayExp: atomExp, indexExp: atomExp) -> list[WasmInstr]:
 
     # add 4 for the array header
     instructions += [WasmInstrConst('i32', 4)]
+    instructions += [WasmInstrNumBinOp('i32', 'add')]
+
+    # add the offset to the array address
+    instructions += [compileAtomicExpr(arrayExp)]
     instructions += [WasmInstrNumBinOp('i32', 'add')]
 
     return instructions
