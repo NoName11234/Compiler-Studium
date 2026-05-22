@@ -352,7 +352,7 @@ def compileInitArray(lenExp: atomExp, elemTy: ty, cfg: CompilerConfig) -> list[W
 
     ## check length is smaller than maximum array size
     instructions += [compileAtomicExpr(lenExp)]
-    instructions += [WasmInstrConst('i64', int(cfg.defaultMaxArraySize / sizeOfDataType))]
+    instructions += [WasmInstrConst('i64', int(cfg.maxArraySize / sizeOfDataType))]
     instructions += [WasmInstrIntRelOp('i64', 'lt_s')]
     instructions += [WasmInstrIf(None, [], arraySizeErrorInstructions + terminateInstructions)]
     
