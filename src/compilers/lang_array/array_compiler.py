@@ -1,7 +1,6 @@
 from lang_array.array_astAtom import *
 import lang_array.array_ast as plainAst
 from common.wasm import *
-from common.symtab import VarInfo
 import lang_array.array_tychecker as array_tychecker
 import lang_array.array_transform as array_transform
 from lang_array.array_compilerSupport import *
@@ -13,21 +12,22 @@ def compileModule(m: plainAst.mod, cfg: CompilerConfig) -> WasmModule:
     Compiles the given module.
     """
     vars = array_tychecker.tycheckModule(m)
-    stmts = array_transform.transStmts(m.stmts, array_transform.Ctx())
+    context = array_transform.Ctx()
+    stmts = array_transform.transStmts(m.stmts, context)
     instrs = compileStmts(stmts, cfg)
     idMain = WasmId('$main')
-    locals: list[tuple[WasmId, WasmValtype]] = [createLocals(ident, type) for (ident, type) in vars.items()]
+    locals: list[tuple[WasmId, WasmValtype]] = [createLocals(ident, type.ty) for (ident, type) in vars.items()]
     return WasmModule(imports=wasmImports(cfg.maxMemSize),
         exports=[WasmExport("main", WasmExportFunc(idMain))],
         globals= Globals.decls(),
         data= Errors.data(),
         funcTable=WasmFuncTable([]),
-        funcs=[WasmFunc(idMain, [], None, locals + Locals.decls(), instrs)])
+        funcs=[WasmFunc(idMain, [], None, locals + Locals.decls() + [createLocals(ident, type) for (ident, type) in context.freshVars.items()], instrs)])
 
-def createLocals(ident: ident, type: VarInfo[ty]) -> tuple[WasmId, WasmValtype]:
+def createLocals(ident: ident, type: ty) -> tuple[WasmId, WasmValtype]:
     wasmId = identToWasmId(ident)
     
-    match type.ty:
+    match type:
         case Int():
             return (wasmId, 'i64')
         case Bool():
@@ -53,6 +53,12 @@ def tyOfAtomExp(atomExp: atomExp) -> ty:
     
     return atomExp.ty
 
+def tyOfArray(arrayTy: ty) -> ty:
+    match arrayTy:
+        case Array(elemTy):
+            return elemTy
+        case _:
+            raise Exception(f'Given type {arrayTy} is not of type Array(elemTy)')
 
 block_label_count = 0
 loop_label_count = 0
@@ -88,7 +94,7 @@ def compileStmt(stmt: stmt, cfg: CompilerConfig) -> list [WasmInstr]:
             # compile the instructions for the value to be assigned
             instructions += compileExpr(right, cfg);
 
-            if tyOfAtomExp(left) == Int():
+            if tyOfArray(tyOfAtomExp(left)) == Int():
                 instructions += [WasmInstrMem('i64', 'store')]
             else:
                 instructions += [WasmInstrMem('i32', 'store')]
@@ -231,7 +237,7 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
             #compute the address of the element with size check
             instructions += arrayOffsetInstrs(array, index)
 
-            if tyOfAtomExp(array) == Int():
+            if tyOfArray(tyOfAtomExp(array)) == Int():
                 instructions += [WasmInstrMem('i64', 'load')]
             else:
                 instructions += [WasmInstrMem('i32', 'load')]
@@ -240,7 +246,7 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
             
         case Call(ident, args):
             if ident.name == "print":
-                instructions: list [WasmInstr] = []
+                instructions: list [WasmInstr] = []                
 
                 if tyOfExp(args[-1]) == Int():
                     instructions += compileExprs(args, cfg)
@@ -323,6 +329,12 @@ def compileExpr(exp: exp, cfg: CompilerConfig) -> list [WasmInstr]:
 def compileInitArray(lenExp: atomExp, elemTy: ty, cfg: CompilerConfig) -> list[WasmInstr]:
     instructions: list [WasmInstr] = []
 
+    # get size of array data type
+    if elemTy == Int():
+        sizeOfDataType = 8
+    else:
+        sizeOfDataType = 4
+
     # check length
     arraySizeErrorInstructions = Errors.outputError('ArraySizeError')
     terminateInstructions: list[WasmInstr] = [WasmInstrTrap()]
@@ -335,7 +347,7 @@ def compileInitArray(lenExp: atomExp, elemTy: ty, cfg: CompilerConfig) -> list[W
 
     ## check length is smaller than maximum array size
     instructions += [compileAtomicExpr(lenExp)]
-    instructions += [WasmInstrConst('i64', cfg.defaultMaxArraySize)]
+    instructions += [WasmInstrConst('i64', int(cfg.defaultMaxArraySize / sizeOfDataType))]
     instructions += [WasmInstrIntRelOp('i64', 'lt_s')]
     instructions += [WasmInstrIf(None, [], arraySizeErrorInstructions + terminateInstructions)]
     
@@ -348,7 +360,14 @@ def compileInitArray(lenExp: atomExp, elemTy: ty, cfg: CompilerConfig) -> list[W
     instructions += [WasmInstrConvOp('i32.wrap_i64')]
     instructions += [WasmInstrConst('i32', 4)]
     instructions += [WasmInstrNumBinOp('i32', 'shl')]
-    instructions += [WasmInstrConst('i32', 3)]
+
+    #checks whether type of array values is array or something else
+    #if array the header field must be set to 3 according to the slides, 1 for every other type
+    if isinstance(elemTy, Array):
+        instructions += [WasmInstrConst('i32', 3)]
+    else:
+        instructions += [WasmInstrConst('i32', 1)]
+
     instructions += [WasmInstrNumBinOp('i32', 'xor')]
 
     ## store header at address $@free_ptr
@@ -362,12 +381,7 @@ def compileInitArray(lenExp: atomExp, elemTy: ty, cfg: CompilerConfig) -> list[W
     ## calculate new position of $@free_ptr
     instructions += [compileAtomicExpr(lenExp)]
     instructions += [WasmInstrConvOp('i32.wrap_i64')]
-
-    if elemTy == Int():
-        instructions += [WasmInstrConst('i32', 8)]
-    else:
-        instructions += [WasmInstrConst('i32', 4)]
-
+    instructions += [WasmInstrConst('i32', sizeOfDataType)]
     instructions += [WasmInstrNumBinOp('i32', 'mul')] # multiply length with the size of each element
 
     instructions += [WasmInstrConst('i32', 4)]
@@ -397,8 +411,7 @@ def arrayLenInstrs() -> list[WasmInstr]:
 def arrayOffsetInstrs(arrayExp: atomExp, indexExp: atomExp) -> list[WasmInstr]:
     instructions: list [WasmInstr] = []
 
-    #check whether index is inside bounds
-    arraySizeErrorInstructions = Errors.outputError('ArraySizeError')
+    indexErrorInstructions = Errors.outputError('IndexError')
     terminateInstructions: list[WasmInstr] = [WasmInstrTrap()]
 
     # size check
@@ -409,14 +422,15 @@ def arrayOffsetInstrs(arrayExp: atomExp, indexExp: atomExp) -> list[WasmInstr]:
     instructions += arrayLenInstrs()
     ### load index on stack
     instructions += [compileAtomicExpr(indexExp)]
-    instructions += [WasmInstrIntRelOp('i32', 'gt_u')]
-    instructions += [WasmInstrIf(None, [], arraySizeErrorInstructions + terminateInstructions)]
-    ## check whether index is greater then 0
+    instructions += [WasmInstrIntRelOp('i64', 'gt_s')]
+    instructions += [WasmInstrIf(None, [], indexErrorInstructions + terminateInstructions)]
+    ## check whether index is greater then or 0
     instructions += [compileAtomicExpr(indexExp)]
-    instructions += [WasmInstrConst('i32', 0)]
-    instructions += [WasmInstrIf(None, [], arraySizeErrorInstructions + terminateInstructions)]
+    instructions += [WasmInstrConst('i64', 0)]
+    instructions += [WasmInstrIntRelOp('i64', 'ge_s')]
+    instructions += [WasmInstrIf(None, [], indexErrorInstructions + terminateInstructions)]
 
-    if tyOfAtomExp(arrayExp) == Int():
+    if tyOfArray(tyOfAtomExp(arrayExp)) == Int():
         offset = 8
     else:
         offset = 4
