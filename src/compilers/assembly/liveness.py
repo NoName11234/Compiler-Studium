@@ -98,7 +98,28 @@ class InterfGraphBuilder:
         slide 46 here. You should update self.after and self.before while traversing
         the instructions of the basic block in reverse.
         """
-        raise ValueError('todo')
+        self.after[(bb.index, len(bb.instrs)-1)] = s.copy()
+
+        for index, instruction in reversed(list(enumerate(bb.instrs))):
+            variablesDefined = instrDef(instruction)
+            variablesUsed = instrUse(instruction)
+            variablesBefore = self.after[bb.index, index].copy()
+
+            #remove defined variables
+            for definedVariable in variablesDefined:
+                variablesBefore.remove(definedVariable)
+            
+            #add used variables
+            for usedVariable in variablesUsed:
+                variablesBefore.add(usedVariable)
+            
+            #add new set to the global dictionary before and after
+            self.before[(bb.index, index)] = variablesBefore.copy()
+            
+            if index > 0:
+                self.after[(bb.index, index-1)] = variablesBefore.copy()
+
+        return self.before[(bb.index, 0)]
 
     def liveness(self, g: ControlFlowGraph):
         """
@@ -108,7 +129,45 @@ class InterfGraphBuilder:
         You have to implement the algorithm for computing liveness in a CFG from
         slide 46 here.
         """
-        raise ValueError('todo')
+        #initialise before and after for the basic blocks
+        for vertex in g.vertices:
+            basicBlock = g.getData(vertex)
+            self.before[basicBlock.index, 0] = set()
+            self.after[basicBlock.index, len(basicBlock.instrs)-1] = set()
+
+        liveBeforeForBlocks: dict[int, set[tac.ident]] = {}
+
+        while True:
+            changeOccured = False
+
+            for vertex in g.vertices:
+                basicBlock = g.getData(vertex)
+
+                #check whether liveBefore was already computed for successors -> these variables must be live at the end of this basic block
+                liveBeforeSuccessorsCombined: set[tac.ident] = set()
+
+                for successorVertex in g.succs(vertex):
+                    #check whether there is a set of variables live at the beginning of successorVertex
+                    if successorVertex in liveBeforeForBlocks:
+                        for variable in liveBeforeForBlocks[successorVertex]:
+                            liveBeforeSuccessorsCombined.add(variable)
+                
+                #use liveStart for calculating set of variables live at the beginning of the block
+                liveBefore = self.liveStart(g.getData(vertex), liveBeforeSuccessorsCombined)
+
+                #add liveBefore to internal dictionary and check whether a change occured
+                if vertex in liveBeforeForBlocks:
+                    if liveBeforeForBlocks[vertex] != liveBefore:
+                        changeOccured = True
+                        liveBeforeForBlocks[vertex] = liveBefore
+                else:
+                    changeOccured = True
+                    liveBeforeForBlocks[vertex] = liveBefore
+            
+            if not changeOccured:
+                break
+
+
 
     def __addEdgesForInstr(self, instrId: InstrId, instr: tac.instr, interfG: InterfGraph):
         """
@@ -130,7 +189,10 @@ class InterfGraphBuilder:
           graph does not have any edges.
         - Use __addEdgesForInstr to fill the edges of the interference graph.
         """
-        raise ValueError('todo')
+        interfGraph: InterfGraph = Graph('undirected')
+
+        return interfGraph
+
 
 def buildInterfGraph(g: ControlFlowGraph) -> InterfGraph:
     builder = InterfGraphBuilder()
