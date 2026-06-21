@@ -33,7 +33,23 @@ def colorInterfGraph(g: InterfGraph, secondaryOrder: dict[tac.ident, int]={},
     log.debug(f"Coloring interference graph with maxRegs={maxRegs}")
     colors: dict[tac.ident, int] = {}
     forbidden: dict[tac.ident, set[int]] = {}
-    q = PrioQueue(secondaryOrder)
-    raise ValueError('implement me')
+    queue = PrioQueue(secondaryOrder)
+    
+    #initialise queue and dictionary for forbidden colors
+    for vertex in g.vertices:
+        forbidden[vertex] = set()
+    
+    while not queue.isEmpty():
+        nextVertex = queue.pop()
+        color = chooseColor(nextVertex, forbidden)
+        colors[nextVertex] = color
+
+        #get connected vertices of vertex for updating forbidden colors
+        succeccors = g.succs(nextVertex)
+
+        for succeccor in succeccors:
+            forbidden[succeccor].add(color)
+            queue.incPrio(succeccor, 1)
+
     m = RegisterAllocMap(colors, maxRegs)
     return m
