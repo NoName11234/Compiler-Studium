@@ -7,7 +7,17 @@ def chooseColor(x: tac.ident, forbidden: dict[tac.ident, set[int]]) -> int:
     """
     Returns the lowest possible color for variable x that is not forbidden for x.
     """
-    raise ValueError('implement me')
+    forbiddenColors = forbidden[x]
+
+    color:int = 1
+
+    while True:
+        if color in forbiddenColors:
+            color = color + 1
+        else:
+            break
+    
+    return color
 
 def colorInterfGraph(g: InterfGraph, secondaryOrder: dict[tac.ident, int]={},
                      maxRegs: int=MAX_REGISTERS) -> RegisterMap:
