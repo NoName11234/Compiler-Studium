@@ -177,7 +177,19 @@ class InterfGraphBuilder:
         You should implement the algorithm specified on the slide
         "Computing the interference graph" (slide 50) here.
         """
-        raise ValueError('todo')
+        definedVariables = instrDef(instr)
+        variablesUsedAfterInstruction = self.after[instrId]
+
+        for definedVariable in definedVariables:
+            for variableUsedAfter in variablesUsedAfterInstruction:
+                if definedVariable != variableUsedAfter:
+                    if not interfG.hasVertex(definedVariable):
+                        interfG.addVertex(definedVariable, None)
+                    
+                    if not interfG.hasVertex(variableUsedAfter):
+                        interfG.addVertex(variableUsedAfter, None)
+                    
+                    interfG.addEdge(definedVariable, variableUsedAfter)
 
     def build(self, g: ControlFlowGraph) -> InterfGraph:
         """
