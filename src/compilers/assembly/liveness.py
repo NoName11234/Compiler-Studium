@@ -203,6 +203,16 @@ class InterfGraphBuilder:
         """
         interfGraph: InterfGraph = Graph('undirected')
 
+        #fill sets before and after
+        self.liveness(g)
+
+        #fill the edges of the interference graph
+        for vertex in g.vertices:
+            basicBlock = g.getData(vertex)
+            
+            for index, instruction in enumerate(basicBlock.instrs):
+                self.__addEdgesForInstr((basicBlock.index, index), instruction, interfGraph)
+
         return interfGraph
 
 
