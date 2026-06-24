@@ -216,8 +216,6 @@ class InterfGraphBuilder:
             for index, instruction in enumerate(basicBlock.instrs):
                 self.__addEdgesForInstr((basicBlock.index, index), instruction, interfGraph)
 
-        print(self.before)
-        print(self.after)
 
         return interfGraph
 
