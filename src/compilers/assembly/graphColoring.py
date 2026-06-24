@@ -9,7 +9,7 @@ def chooseColor(x: tac.ident, forbidden: dict[tac.ident, set[int]]) -> int:
     """
     forbiddenColors = forbidden[x]
 
-    color:int = 1
+    color:int = 0
 
     while True:
         if color in forbiddenColors:
@@ -38,7 +38,9 @@ def colorInterfGraph(g: InterfGraph, secondaryOrder: dict[tac.ident, int]={},
     #initialise queue and dictionary for forbidden colors
     for vertex in g.vertices:
         forbidden[vertex] = set()
+        queue.push(vertex, 0)
     
+
     while not queue.isEmpty():
         nextVertex = queue.pop()
         color = chooseColor(nextVertex, forbidden)
