@@ -107,7 +107,8 @@ class InterfGraphBuilder:
 
             #remove defined variables
             for definedVariable in variablesDefined:
-                variablesBefore.remove(definedVariable)
+                if definedVariable in variablesBefore:
+                    variablesBefore.remove(definedVariable)
             
             #add used variables
             for usedVariable in variablesUsed:
@@ -132,8 +133,9 @@ class InterfGraphBuilder:
         #initialise before and after for the basic blocks
         for vertex in g.vertices:
             basicBlock = g.getData(vertex)
-            self.before[basicBlock.index, 0] = set()
-            self.after[basicBlock.index, len(basicBlock.instrs)-1] = set()
+            if len(basicBlock.instrs) > 0:
+                self.before[basicBlock.index, 0] = set()
+                self.after[basicBlock.index, len(basicBlock.instrs)-1] = set()
 
         liveBeforeForBlocks: dict[int, set[tac.ident]] = {}
 
@@ -143,26 +145,27 @@ class InterfGraphBuilder:
             for vertex in g.vertices:
                 basicBlock = g.getData(vertex)
 
-                #check whether liveBefore was already computed for successors -> these variables must be live at the end of this basic block
-                liveBeforeSuccessorsCombined: set[tac.ident] = set()
+                if len(basicBlock.instrs) > 0:
+                    #check whether liveBefore was already computed for successors -> these variables must be live at the end of this basic block
+                    liveBeforeSuccessorsCombined: set[tac.ident] = set()
 
-                for successorVertex in g.succs(vertex):
-                    #check whether there is a set of variables live at the beginning of successorVertex
-                    if successorVertex in liveBeforeForBlocks:
-                        for variable in liveBeforeForBlocks[successorVertex]:
-                            liveBeforeSuccessorsCombined.add(variable)
+                    for successorVertex in g.succs(vertex):
+                        #check whether there is a set of variables live at the beginning of successorVertex
+                        if successorVertex in liveBeforeForBlocks:
+                            for variable in liveBeforeForBlocks[successorVertex]:
+                                liveBeforeSuccessorsCombined.add(variable)
                 
-                #use liveStart for calculating set of variables live at the beginning of the block
-                liveBefore = self.liveStart(g.getData(vertex), liveBeforeSuccessorsCombined)
+                    #use liveStart for calculating set of variables live at the beginning of the block
+                    liveBefore = self.liveStart(g.getData(vertex), liveBeforeSuccessorsCombined)
 
-                #add liveBefore to internal dictionary and check whether a change occured
-                if vertex in liveBeforeForBlocks:
-                    if liveBeforeForBlocks[vertex] != liveBefore:
+                    #add liveBefore to internal dictionary and check whether a change occured
+                    if vertex in liveBeforeForBlocks:
+                        if liveBeforeForBlocks[vertex] != liveBefore:
+                            changeOccured = True
+                            liveBeforeForBlocks[vertex] = liveBefore
+                    else:
                         changeOccured = True
                         liveBeforeForBlocks[vertex] = liveBefore
-                else:
-                    changeOccured = True
-                    liveBeforeForBlocks[vertex] = liveBefore
             
             if not changeOccured:
                 break
@@ -212,6 +215,9 @@ class InterfGraphBuilder:
             
             for index, instruction in enumerate(basicBlock.instrs):
                 self.__addEdgesForInstr((basicBlock.index, index), instruction, interfGraph)
+
+        print(self.before)
+        print(self.after)
 
         return interfGraph
 
