@@ -7,6 +7,7 @@ from assembly.common import *
 from assembly.mipsHelper import *
 from common.compilerSupport import *
 
+
 def getOperandI(operand: str) -> mips.opI:
     match operand:
         case 'ADD':
@@ -54,12 +55,23 @@ def assignToMips(i: tacSpill.Assign) -> list[mips.instr]:
                 case tacSpill.Const(leftValue):
                     match right:
                         case tacSpill.Const(rightValue):
-                            #load left const in register
-                            instructions.append(mips.LoadI(reg(i.var), imm(leftValue)))
-                            #get operand
-                            operand = getOperandI(op.name)
-                            #add right const to register value
-                            instructions.append(mips.OpI(operand, reg(i.var), reg(i.var), imm(rightValue)))
+                            if op.name == 'ADD' or op.name == 'LT_S':
+                                #load left const in register
+                                instructions.append(mips.LoadI(reg(i.var), imm(leftValue)))
+                                #get operand
+                                operand = getOperandI(op.name)
+                                #add right const to register value
+                                instructions.append(mips.OpI(operand, reg(i.var), reg(i.var), imm(rightValue)))
+                            else:
+                                secondRegister = Regs.t1 if i.var == Regs.t0 else Regs.t0
+                                #load left const in own register
+                                instructions.append(mips.LoadI(reg(i.var), imm(leftValue)))
+                                #load right const in other spill register
+                                instructions.append(mips.LoadI(reg(secondRegister), imm(rightValue)))
+                                #get operand
+                                operand = getOperand(op.name)
+                                #execute operation with both registers
+                                instructions.append(mips.Op(operand, reg(i.var), reg(i.var), reg(secondRegister)))
                         case tacSpill.Name(rightName):
                             #load left const in register
                             instructions.append(mips.LoadI(reg(i.var), imm(leftValue)))
@@ -70,12 +82,20 @@ def assignToMips(i: tacSpill.Assign) -> list[mips.instr]:
                 case tacSpill.Name(leftName):
                     match right:
                         case tacSpill.Const(rightValue):
-                            #load left register in own register
-                            instructions.append(mips.Move(reg(i.var), reg(leftName)))
-                            #get operand
-                            operand = getOperandI(op.name)
-                            #apply right constant to own register
-                            instructions.append(mips.OpI(operand, reg(i.var), reg(i.var), imm(rightValue)))
+                            if op.name == 'ADD' or op.name == 'LT_S':
+                                #load left register in own register
+                                instructions.append(mips.Move(reg(i.var), reg(leftName)))
+                                #get operand
+                                operand = getOperandI(op.name)
+                                #apply right constant to own register
+                                instructions.append(mips.OpI(operand, reg(i.var), reg(i.var), imm(rightValue)))
+                            else:
+                                #load right constant to own register
+                                instructions.append(mips.LoadI(reg(i.var), imm(rightValue)))
+                                #get operand
+                                operand = getOperand(op.name)
+                                #apply left register to own register
+                                instructions.append(mips.Op(operand, reg(i.var), reg(leftName), reg(i.var)))
                         case tacSpill.Name(rightName):
                             #load left register in own register
                             instructions.append(mips.Move(reg(i.var), reg(leftName)))
@@ -83,7 +103,5 @@ def assignToMips(i: tacSpill.Assign) -> list[mips.instr]:
                             operand = getOperand(op.name)
                             #apply right register to own register
                             instructions.append(mips.Op(operand, reg(i.var), reg(i.var), reg(rightName)))
-
-
-
+    
     return instructions
